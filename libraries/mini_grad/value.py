@@ -3,8 +3,8 @@ from typing import List, Set, Tuple, Callable, Union, Type
 from typing_extensions import Self
 from graphviz import Digraph
 
-from base import Base
-from ops import Op, Add, Mul, Sub, Div
+from .base import Base
+from .base_ops import Op, Add, Mul, Sub, Div
 
 
 class Value(Base):
@@ -20,8 +20,7 @@ class Value(Base):
     def __init__(
         self, data: float, name: str = None, freeze: bool = False, _op: Op = None
     ):
-        super().__init__(children=[], name=name)
-        self.data = data
+        super().__init__(data=data, children=[], name=name)
         self._grad = None
         self._op = _op
         self._freeze = freeze
@@ -63,7 +62,6 @@ class Value(Base):
     def _plot(
         self, dot: Digraph, visited: Set[int] = set()
     ) -> Tuple[Digraph, Set[int]]:
-        visited.add(self.id)
         dot.node(
             str(self.id),
             label=f"{self.name or ''} | v={self.data:.4f} | g={self.grad:.4f}",
@@ -121,19 +119,36 @@ class Value(Base):
 
 
 class Parameter(Value):
+    def __init__(self, data: float, name: str = None):
+        super().__init__(data, name=name, freeze=True)
+        self._step = 0
+
+    @property
+    def step(self):
+        return self._step
+
+    def prepare(self, data: float):
+        """Should be called after each iteration to update the parameters"""
+        self._step += 1
+        self._data = data
+
     def _plot(
         self, dot: Digraph, visited: Set[int] = set()
     ) -> Tuple[Digraph, Set[int]]:
         dot.node(
             str(self.id),
-            label=f"{self.name or ''} | v={self.data:.4f}",
+            label=f"{self.name} | v={self.data:.4f}",
             shape="record",
-            attrs={"color": "blue", "fontstyle": "italic"},
+            color="blue",
+            # attrs={"color": "blue", "fontstyle": "italic"},
         )
         return dot, visited
 
 
 class Variable(Value):
+    def __init__(self, data: float, name: str = None, freeze: bool = False):
+        super().__init__(data, name=name, freeze=freeze)
+
     def _plot(
         self, dot: Digraph, visited: Set[int] = set()
     ) -> Tuple[Digraph, Set[int]]:
@@ -141,6 +156,6 @@ class Variable(Value):
             str(self.id),
             label=f"{self.name or ''} | v={self.data:.4f} | g={self.grad:.4f}",
             shape="record",
-            attrs={"color": "orange", "fontstyle": "bold"},
+            # attrs={"color": "orange", "fontstyle": "bold"},
         )
         return dot, visited

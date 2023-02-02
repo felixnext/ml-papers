@@ -1,76 +1,12 @@
-from abc import abstractmethod
-import logging
-from typing import List, Set, Tuple
+"""Defines more advanced ops"""
 
-from graphviz import Digraph
+from typing import List
+
 import numpy as np
 
-from base import Base
-
-
-class Op(Base):
-    """Defines basic operator"""
-
-    def __init__(self, inputs: List[Base], output: Base, name: str, op_name: str):
-        super().__init__(children=[], name=name)
-        self._values = inputs
-        self._output = output
-        self._op_name = op_name
-
-    @property
-    def op_name(self):
-        return self._op_name
-
-    def __repr__(self):
-        return f"Op({self.name} dim={len(self._values)} op={self.op_name})"
-
-    @abstractmethod
-    def _forward(self, _pull: bool = False):
-        raise NotImplementedError
-
-    def forward(self, _pull: bool = True):
-        res = self._forward(_pull=_pull)
-        self._output.data = res
-        return res
-
-    @abstractmethod
-    def _backward(self):
-        raise NotImplementedError
-
-    def backward(self):
-        # prepare gradients of the values
-        for v in self._values:
-            if not hasattr(v, "_grad"):
-                logging.warning(f"Value {v} has no grad")
-                continue
-            if v._grad is None:
-                v._grad = 0
-
-        # iterate the backward pass
-        self._backward()
-
-        # execute sub operations
-        for v in self._values:
-            v.backward()
-
-    def _plot(
-        self, dot: Digraph, visited: Set[int] = set()
-    ) -> Tuple[Digraph, Set[int]]:
-        dot.node(str(self.id), label=self.op_name, shape="circle")
-        return dot, visited
-
-    def _iter_plot(
-        self, dot: Digraph, visited: Set[int], level: int, max_level: int
-    ) -> Tuple[Digraph, Set[int]]:
-        # call super function
-        dot, visited = super()._iter_plot(dot, visited, level, max_level)
-
-        # plot current edges
-        for v in self._values:
-            dot, visited = v._iter_plot(dot, visited, level, max_level)
-            dot.edge(str(v.id), str(self.id))
-
-        return dot, visited
+from .base import Base
+from .base_ops import Op
+from .value import Value
 
 
 class UniaryOp(Op):
@@ -81,85 +17,14 @@ class UniaryOp(Op):
             raise ValueError(f"Uniary operator expects 1 value, got {len(value)}")
         super().__init__(value, output, name, op_name)
 
-
-class Add(Op):
-    """Defines addition operator"""
-
-    def __init__(self, values: List[Base], output: Base, name: str):
-        if len(values) != 2:
-            raise ValueError(f"Add operator expects 2 values, got {len(values)}")
-        super().__init__(values, output, name, "+")
-
-    def _forward(self, _pull: bool = True):
-        return sum(v.forward(_pull=_pull) for v in self._values)
-
-    def _backward(self):
-        # distribute the gradient to the inputs
-        for v in self._values:
-            v._grad += self._output.grad
-
-
-class Mul(Op):
-    """Defines multiplication operator"""
-
-    def __init__(self, values: List[Base], output: Base, name: str):
-        if len(values) != 2:
-            raise ValueError(f"Mul operator expects 2 values, got {len(values)}")
-        super().__init__(values, output, name, "*")
-
-    def _forward(self, _pull: bool = True):
-        return np.prod([v.forward(_pull=_pull) for v in self._values])
-
-    def _backward(self):
-        # distribute the gradient to the inputs
-        self._values[0]._grad += self._output.grad * self._values[1].forward(
-            _pull=False
-        )
-        self._values[1]._grad += self._output.grad * self._values[0].forward(
-            _pull=False
-        )
-
-
-class Sub(Op):
-    """Defines subtraction operator"""
-
-    def __init__(self, values: List[Base], output: Base, name: str):
-        if len(values) != 2:
-            raise ValueError(f"Sub operator expects 2 values, got {len(values)}")
-        super().__init__(values, output, name, "-")
-
-    def _forward(self, _pull: bool = True):
-        return self._values[0].forward(_pull=_pull) - self._values[1].forward(
-            _pull=_pull
-        )
-
-    def _backward(self):
-        # distribute the gradient to the inputs
-        self._values[0]._grad += self._output.grad
-        self._values[1]._grad -= self._output.grad
-
-
-class Div(Op):
-    """Defines division operator"""
-
-    def __init__(self, values: List[Base], output: Base, name: str):
-        if len(values) != 2:
-            raise ValueError(f"Div operator expects 2 values, got {len(values)}")
-        super().__init__(values, output, name, "/")
-
-    def _forward(self, _pull: bool = True):
-        return self._values[0].forward(_pull=_pull) / self._values[1].forward(
-            _pull=_pull
-        )
-
-    def _backward(self):
-        # distribute the gradient to the inputs
-        self._values[0]._grad += self._output.grad / self._values[1].forward(
-            _pull=False
-        )
-        self._values[1]._grad -= (
-            self._output.grad * self._values[0].forward(_pull=False)
-        ) / self._values[1].forward(_pull=False) ** 2
+    @classmethod
+    def apply(cls, x: Base, y: Value = None, name: str = None) -> Value:
+        if y is None:
+            y = Value(0)
+        op = cls([x], y, name)
+        y._op = op
+        y.forward()
+        return y
 
 
 class Tanh(UniaryOp):
@@ -178,6 +43,11 @@ class Tanh(UniaryOp):
         )
 
 
+def tanh(x: Base, name: str = None) -> Value:
+    """Defines tanh function"""
+    return Tanh.apply(x, name=name)
+
+
 class Sigmoid(UniaryOp):
     """Defines sigmoid operator"""
 
@@ -192,3 +62,23 @@ class Sigmoid(UniaryOp):
         self._values[0]._grad += self._output.grad * (
             self._output.forward(False) * (1 - self._output.forward(False))
         )
+
+
+def sigmoid(x: Base, name: str = None) -> Value:
+    """Defines sigmoid function"""
+    return Sigmoid.apply(x, name=name)
+
+
+def multi_apply(x: List[Value], op: Op):
+    """Applies an op to a list of values"""
+    if len(x) == 1:
+        return x[0]
+    if len(x) == 2:
+        inner = x[1]
+    if len(x) > 2:
+        inner = multi_apply(x[1:], op)
+    y = Value(0)
+    _op = op([x[0], inner], y)
+    y._op = _op
+    y.forward()
+    return y

@@ -2,7 +2,7 @@
 
 
 from abc import abstractmethod
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Any
 from typing_extensions import Self
 
 from graphviz import Digraph
@@ -16,9 +16,14 @@ class Base:
         name (str, optional): Name of the node. Defaults to None.
     """
 
-    def __init__(self, children: List[Self], name=None):
+    def __init__(self, data: Any, children: List[Self], name=None):
         self._name = name
         self._childs = children or []
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
 
     @property
     def id(self):
@@ -78,6 +83,7 @@ class Base:
                         sub, visited = child._iter_plot(
                             sub, visited, level + 1, max_level
                         )
+
         return dot, visited
 
     def plot(self, max_level: int = 3) -> Digraph:
@@ -92,3 +98,12 @@ class Base:
         dot = Digraph(format="svg", graph_attr={"rankdir": "LR"})
         dot, _ = self._iter_plot(dot, set(), 0, max_level)
         return dot
+
+
+class Derived(Base):
+    def __init__(self, data: Any, children: List[Self], name=None):
+        super().__init__(data, children, name)
+
+    def base(self):
+        """Should return the base value"""
+        raise NotImplementedError
