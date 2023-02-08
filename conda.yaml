@@ -1,0 +1,25 @@
+name: research
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - conda-forge::pandas
+  - conda-forge::numpy
+  - conda-forge::pytorch   # might not be available for 3.11 (need to be compile from scratch)
+  - conda-forge::graphviz
+  - ipython
+  - ipykernel
+  - notebook
+  - gluonts
+  - conda-forge::transformers
+  - evaluate
+  - accelerate
+  - pip
+  - pip:
+    - torchviz
+    - time_helper
+    - ujson
+    - datasets
+    - matplotlib
+    - seaborn
+    - fire
