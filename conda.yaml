@@ -5,7 +5,8 @@ dependencies:
   - python=3.11
   - conda-forge::pandas
   - conda-forge::numpy
-  - conda-forge::pytorch   # might not be available for 3.11 (need to be compile from scratch)
+  # - conda-forge::pytorch   # might not be available for 3.11 (need to be compile from scratch)
+  - conda::force::torch-gpu
   - conda-forge::graphviz
   - ipython
   - ipykernel
@@ -23,3 +24,5 @@ dependencies:
     - matplotlib
     - seaborn
     - fire
+    - lazypredict
+    - tiktoken
