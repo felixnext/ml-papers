@@ -1,5 +1,6 @@
 """Defines some default transformer based models"""
 
+from typing import List
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -7,6 +8,7 @@ from torch.nn import functional as F
 from .base_models import LanguageModel
 from blocks import TransformerBlock
 from data import Tokenizer
+from layers import MultiAttentionHead
 
 
 class LMTransformerLight(LanguageModel):
@@ -42,6 +44,11 @@ class LMTransformerLight(LanguageModel):
         )
         self.norm = nn.LayerNorm(emb_size)
         self.lm_head = nn.Linear(emb_size, self.vocab_size)
+
+    @property
+    def attention_layers(self) -> List[MultiAttentionHead]:
+        # retrieve the attention layers
+        return [block.att_head for block in self.blocks]
 
     def forward(self, x):
         # validate device

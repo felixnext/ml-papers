@@ -44,7 +44,7 @@ class TransformerBlock(nn.Module):
         )
 
         # normalization
-        # TODO: customize normalization
+        # FEAT: customize normalization
         self.norm1 = nn.LayerNorm(emb_size)
         self.norm2 = nn.LayerNorm(emb_size)
 
